@@ -1,0 +1,21 @@
+DIGITE ISSO NO TERMINAL DO LINUX,
+
+ATUALIZE SEU LINUX COM "sudo apt update"
+
+CERTIFIQUE-SE DE TER UMA BOA CONEXÃO COM A INTERNET
+
+1:
+source venv/bin/activate
+
+
+2:
+pip install --upgrade pip
+pip install playwright
+python -m playwright install chromium
+
+
+3:
+python3 baixar_drivedepobre.py
+
+
+QUALQUER DÚVIDA, CHAMEM NO PRIVADO!!
