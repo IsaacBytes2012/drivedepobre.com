@@ -17,21 +17,23 @@ OUT_DIR = "downloads"
 os.makedirs(OUT_DIR, exist_ok=True)
 visited_folders = set()
 
-# Sanitiza nomes de arquivos/pastas
+# Sanitiza nomes de arquivos/pastas (remove apenas caracteres inválidos)
 def sanitize_filename(name):
     return re.sub(r'[\\/*?:"<>|]', "_", name).strip()
 
-# Limpa nomes de arquivos e remove qualquer prefixo estranho
+# Limpa nomes de arquivos e remove prefixos indesejados
 def clean_file_name(text):
-    # Remove caracteres inválidos
-    text = re.sub(r'[^\w\s\-\.]', '', text)
+    text = re.sub(r'[^\w\s\-\.]', '', text, flags=re.UNICODE)
 
-    # 🔹 Remove qualquer prefixo antes da primeira palavra “legítima”
-    match = re.search(r'\b([A-ZÀ-ÿ0-9][\w\s\-]*)', text)
-    if match:
-        text = match.group(1)
+    # 🔹 Remove prefixos indesejados no começo
+    unwanted_prefixes = [
+        "picture_as_pdf", "Resolva_", "arquivo_", "download_", "video_"
+    ]
+    for prefix in unwanted_prefixes:
+        if text.startswith(prefix):
+            text = text[len(prefix):]
 
-    # 🔹 Remove palavras inúteis no meio
+    # 🔹 Remove palavras desnecessárias no meio
     remove_words = [
         "picture", "pdf", "arquivo", "baixar", "download",
         "documento", "file", "imagem", "video", "mp4"
@@ -39,19 +41,23 @@ def clean_file_name(text):
     pattern = r'\b(?:' + '|'.join(remove_words) + r')\b'
     text = re.sub(pattern, '', text, flags=re.IGNORECASE)
 
-    # 🔹 Remove espaços extras e ponto no final
+    # 🔹 Remove espaços extras
     text = re.sub(r'\s+', ' ', text).strip()
-    text = text.rstrip(".")
+
+    # 🔹 Remove extensão no final
+    text = re.sub(r'\.(pdf|mp4|jpg|png|docx|xlsx|zip|rar)$', '', text, flags=re.IGNORECASE)
 
     return text
 
 # Limpa nomes de pastas e remove prefixos indesejados
 def clean_folder_name(name):
-    name = re.sub(r'[^\w\s\-\.]', '', name)
+    name = re.sub(r'[^\w\s\-\.]', '', name)  # remove caracteres inválidos
+    # 🔹 Remove prefixos comuns em pastas
     unwanted_prefixes = ["folder", "pasta", "dir", "subfolder"]
     for prefix in unwanted_prefixes:
         if name.lower().startswith(prefix.lower()):
             name = name[len(prefix):]
+    # 🔹 Remove espaços extras
     name = re.sub(r'\s+', ' ', name).strip()
     return name
 
@@ -78,7 +84,7 @@ def process_folder(page, folder_url):
     for a in subfolder_anchors:
         href = a.get_attribute("href")
         full_url = normalize(href)
-        visible_name = a.inner_text().strip()
+        visible_name = a.evaluate("el => el.childNodes[el.childNodes.length-1].textContent.trim()")
         subfolders.append((full_url, visible_name))
 
     # 🔹 Arquivos
@@ -87,7 +93,7 @@ def process_folder(page, folder_url):
     for a in file_anchors:
         href = a.get_attribute("href")
         full_url = normalize(href)
-        visible_name = a.inner_text().strip()
+        visible_name = a.evaluate("el => el.childNodes[el.childNodes.length-1].textContent.trim()")
         file_links.append((full_url, visible_name))
 
     return subfolders, file_links
@@ -114,8 +120,14 @@ def download_file(context, file_url, visible_name, local_path):
         download = download_info.value
         suggested = download.suggested_filename
         ext = os.path.splitext(suggested)[1] if suggested else ""
-        final_name = clean_file_name(visible_name) + ext
-        final_name = sanitize_filename(final_name)
+
+        # 🔹 Mantém nome exato para vídeos .mp4
+        if visible_name.lower().endswith(".mp4"):
+            final_name = sanitize_filename(visible_name)
+        else:
+            final_name = clean_file_name(visible_name).rstrip(".") + ext
+            final_name = sanitize_filename(final_name)
+
         save_path = os.path.join(local_path, final_name)
 
         # Evita sobrescrever arquivos
