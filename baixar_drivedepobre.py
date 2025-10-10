@@ -71,12 +71,14 @@ def normalize(url):
 def process_folder(page, folder_url):
     print(f"📂 Acessando pasta: {folder_url}")
     try:
-        page.goto(folder_url, wait_until="domcontentloaded", timeout=60000)
+        # ⏳ Timeout maior e espera completa do DOM
+        page.goto(folder_url, wait_until="domcontentloaded", timeout=90000)  # 90 segundos
     except Exception as e:
         print(f"⚠️ Erro ao acessar {folder_url}: {e}")
         return [], []
 
-    time.sleep(2)
+    # 🔹 Espera extra para carregamento completo do conteúdo dinâmico (15 segundos)
+    time.sleep(15)
 
     # 🔹 Subpastas
     subfolder_anchors = page.locator("a.text-dark.fw-medium[href^='/pasta/']").all()
