@@ -188,7 +188,7 @@ def download_file(context, file_url, visible_name, local_path, max_attempts=4):
 
 # 🚀 Execução principal
 with sync_playwright() as p:
-    browser = p.chromium.launch(headless=False, slow_mo=500)
+    browser = p.chromium.launch(headless=True, slow_mo=500)
     context = browser.new_context(
         accept_downloads=True,
         user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, como Gecko) Chrome/120 Safari/537.36"
