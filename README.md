@@ -1,6 +1,6 @@
 # drivedepobre.com
 
-**Versão 3.0**
+**Versão 3.2**
 
 CRIAR O AMBIENTE VIRTUAL: python -m venv venv
 
