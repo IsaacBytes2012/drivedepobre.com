@@ -161,19 +161,27 @@ def process_folder(page, folder_url, logger: GuiLogger=None):
     if logger: logger.log(f"📑 Links encontrados: {len(file_links)} arquivos, {len(subfolders)} pastas.")
     return subfolders, file_links
 
-def download_file(context, file_url, visible_name, local_path,
-                  logger: GuiLogger=None,
-                  max_attempts=4,
-                  pre_wait_random=(5,10),
-                  retry_random_delay=(5,15),
-                  expect_download_timeout=120000):
+def download_file(
+    context,
+    file_url,
+    visible_name,
+    local_path,
+    logger: GuiLogger = None,
+    max_attempts: int = 4,
+    pre_wait_random: tuple = (5, 10),
+    retry_random_delay: tuple = (5, 15),
+    expect_download_timeout: int = 120000
+):
     os.makedirs(local_path, exist_ok=True)
     attempt = 1
+
     while attempt <= max_attempts:
         page = context.new_page()
         try:
-            if logger: logger.log(f"📥 Baixando ({attempt}/{max_attempts}): {visible_name} -> {local_path}")
-            logger and logger.set_item_status(os.path.join(local_path, visible_name), f"baixando ({attempt})")
+            if logger:
+                logger.log(f"📥 Baixando ({attempt}/{max_attempts}): {visible_name} -> {local_path}")
+                logger.set_item_status(os.path.join(local_path, visible_name), f"baixando ({attempt})")
+
             page.goto(file_url, wait_until="domcontentloaded", timeout=60000)
             time.sleep(random.randint(*pre_wait_random))
 
@@ -194,6 +202,15 @@ def download_file(context, file_url, visible_name, local_path,
             if not found:
                 raise Exception("Botão/link de download não encontrado.")
 
+            # 🧩 Verifica o nome do arquivo antes de tentar baixar
+            visible_lower = visible_name.lower()
+            if not (visible_lower.endswith(".pdf") or visible_lower.endswith(".mp4")):
+                if logger:
+                    logger.log(f"🚫 Ignorado (não é PDF/MP4): {visible_name}")
+                    logger.set_item_status(os.path.join(local_path, visible_name), "ignorado")
+                page.close()
+                return  # pula este arquivo
+
             # Clica e verifica erro visual
             with page.expect_download(timeout=expect_download_timeout) as download_info:
                 if btn_download.count() > 0:
@@ -203,20 +220,18 @@ def download_file(context, file_url, visible_name, local_path,
 
                 # ⏳ Espera um pouco e verifica mensagem de erro
                 time.sleep(5)
-                error_elem = page.locator('text="Erro no download."')
-                if error_elem.count() > 0:
+                if page.locator('text="Erro no download."').count() > 0:
                     raise Exception("Interface exibiu: Erro no download.")
 
             download = download_info.value
 
-            # 💾 Salva arquivo com nome limpo (mesma lógica)
+            # 💾 Salva arquivo com nome limpo
             suggested = download.suggested_filename
             ext = os.path.splitext(suggested)[1] if suggested else ""
             if visible_name.lower().endswith(".mp4"):
                 final_name = sanitize_filename(visible_name)
             else:
-                final_name = clean_file_name(visible_name).rstrip(".") + ext
-                final_name = sanitize_filename(final_name)
+                final_name = sanitize_filename(clean_file_name(visible_name).rstrip(".") + ext)
 
             save_path = os.path.join(local_path, final_name)
             base, ext = os.path.splitext(save_path)
@@ -226,27 +241,35 @@ def download_file(context, file_url, visible_name, local_path,
                 counter += 1
 
             download.save_as(save_path)
-            if logger: logger.log(f"✅ Arquivo salvo: {save_path}")
-            logger and logger.set_item_status(save_path, "concluído")
+
+            if logger:
+                logger.log(f"✅ Arquivo salvo: {save_path}")
+                logger.set_item_status(save_path, "concluído")
+
             time.sleep(random.randint(2, 5))
             page.close()
             return
 
         except Exception as e:
-            if logger: logger.log(f"❌ Erro no download ({attempt}/{max_attempts}): {e}")
-            logger and logger.set_item_status(os.path.join(local_path, visible_name), f"erro ({attempt})")
+            if logger:
+                logger.log(f"❌ Erro no download ({attempt}/{max_attempts}): {e}")
+                logger.set_item_status(os.path.join(local_path, visible_name), f"erro ({attempt})")
+
             attempt += 1
             try:
                 page.close()
             except Exception:
                 pass
+
             if attempt <= max_attempts:
                 retry_delay = random.randint(*retry_random_delay)
-                if logger: logger.log(f"🔄 Tentando novamente em {retry_delay}s...")
+                if logger:
+                    logger.log(f"🔄 Tentando novamente em {retry_delay}s...")
                 time.sleep(retry_delay)
             else:
-                if logger: logger.log(f"⚠️ Arquivo {visible_name} pulado após {max_attempts} tentativas.")
-                logger and logger.set_item_status(os.path.join(local_path, visible_name), "pulado")
+                if logger:
+                    logger.log(f"⚠️ Arquivo {visible_name} pulado após {max_attempts} tentativas.")
+                    logger.set_item_status(os.path.join(local_path, visible_name), "pulado")
 
 # -------------------------
 # Thread de execução principal (para não travar a GUI)
